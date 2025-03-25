@@ -1,76 +1,76 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { tasksCollection, auth } from "../lib/firebase";
-import { addDoc, getDocs, deleteDoc, doc, updateDoc, writeBatch } from "firebase/firestore";
+import { 
+  addDoc, getDocs, deleteDoc, doc, updateDoc, writeBatch 
+} from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { CheckCircle, Trash2, Pencil, LogOut } from "lucide-react";
 import { Reorder, motion } from "framer-motion";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function TodoList() {
-  const [tasks, setTasks] = useState([]);
   const [task, setTask] = useState("");
   const [editTask, setEditTask] = useState(null);
   const [editText, setEditText] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: async () => {
+      const querySnapshot = await getDocs(tasksCollection);
+      return querySnapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => a.order - b.order);
+    },
+  });
 
-  const fetchTasks = async () => {
-    const querySnapshot = await getDocs(tasksCollection);
-    const fetchedTasks = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    fetchedTasks.sort((a, b) => a.order - b.order); 
-    setTasks(fetchedTasks);
-  };
+  const addTaskMutation = useMutation({
+    mutationFn: async (newTask) => {
+      await addDoc(tasksCollection, { text: newTask, completed: false, order: tasks.length });
+    },
+    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+  });
 
-  const addTask = async () => {
-    if (task.trim() === "") return;
-    await addDoc(tasksCollection, { text: task, completed: false, order: tasks.length });
-    setTask("");
-    fetchTasks();
-  };
+  const toggleCompleteMutation = useMutation({
+    mutationFn: async ({ id, completed }) => {
+      await updateDoc(doc(tasksCollection, id), { completed: !completed });
+    },
+    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+  });
 
-  const toggleComplete = async (id, completed) => {
-    await updateDoc(doc(tasksCollection, id), { completed: !completed });
-    fetchTasks();
-  };
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (id) => {
+      await deleteDoc(doc(tasksCollection, id));
+    },
+    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+  });
 
-  const deleteTask = async (id) => {
-    await deleteDoc(doc(tasksCollection, id));
-    fetchTasks();
-  };
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ id, newText }) => {
+      await updateDoc(doc(tasksCollection, id), { text: newText });
+    },
+    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+  });
 
-  const openEditModal = (task) => {
-    setEditTask(task);
-    setEditText(task.text);
-    setIsModalOpen(true);
-  };
-
-  const updateTask = async () => {
-    if (!editTask || editText.trim() === "") return;
-    await updateDoc(doc(tasksCollection, editTask.id), { text: editText });
-    setIsModalOpen(false);
-    setEditTask(null);
-    setEditText("");
-    fetchTasks();
-  };
+  const reorderMutation = useMutation({
+    mutationFn: async (newOrder) => {
+      const batch = writeBatch(tasksCollection.firestore);
+      newOrder.forEach((task, index) => {
+        const taskRef = doc(tasksCollection, task.id);
+        batch.update(taskRef, { order: index });
+      });
+      await batch.commit();
+    },
+    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+  });
 
   const handleLogout = async () => {
     await signOut(auth);
     router.replace("/auth/login");
-  };
-
-  const handleReorder = async (newOrder) => {
-    setTasks(newOrder); 
-    const batch = writeBatch(tasksCollection.firestore);
-    newOrder.forEach((task, index) => {
-      const taskRef = doc(tasksCollection, task.id);
-      batch.update(taskRef, { order: index }); 
-    });
-    await batch.commit();
   };
 
   return (
@@ -95,10 +95,12 @@ export default function TodoList() {
             onChange={(e) => setTask(e.target.value)}
             style={{ color: "black" }}
           />
-          <button onClick={addTask} className="px-4 bg-blue-500 text-white rounded">Add</button>
+          <button onClick={() => addTaskMutation.mutate(task)} className="px-4 bg-blue-500 text-white rounded">
+            Add
+          </button>
         </div>
 
-        <Reorder.Group as="ul" axis="y" values={tasks} onReorder={handleReorder} className="space-y-2">
+        <Reorder.Group as="ul" axis="y" values={tasks} onReorder={(newOrder) => reorderMutation.mutate(newOrder)} className="space-y-2">
           {tasks.map((t) => (
             <Reorder.Item key={t.id} value={t} className="list-none">
               <motion.div
@@ -110,13 +112,13 @@ export default function TodoList() {
                   {t.text}
                 </span>
                 <div className="flex gap-2">
-                  <button onClick={() => toggleComplete(t.id, t.completed)} className="p-2 text-green-600 hover:text-green-800 transition">
+                  <button onClick={() => toggleCompleteMutation.mutate({ id: t.id, completed: t.completed })} className="p-2 text-green-600 hover:text-green-800 transition">
                     <CheckCircle size={20} />
                   </button>
-                  <button onClick={() => openEditModal(t)} className="p-2 text-blue-600 hover:text-blue-800 transition">
+                  <button onClick={() => { setEditTask(t); setEditText(t.text); setIsModalOpen(true); }} className="p-2 text-blue-600 hover:text-blue-800 transition">
                     <Pencil size={20} />
                   </button>
-                  <button onClick={() => deleteTask(t.id)} className="p-2 text-red-600 hover:text-red-800 transition">
+                  <button onClick={() => deleteTaskMutation.mutate(t.id)} className="p-2 text-red-600 hover:text-red-800 transition">
                     <Trash2 size={20} />
                   </button>
                 </div>
@@ -136,8 +138,12 @@ export default function TodoList() {
                 onChange={(e) => setEditText(e.target.value)}
               />
               <div className="flex justify-end gap-2">
-                <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-500 text-white rounded">Cancel</button>
-                <button onClick={updateTask} className="px-4 py-2 bg-blue-500 text-white rounded">Update</button>
+                <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-500 text-white rounded">
+                  Cancel
+                </button>
+                <button onClick={() => { updateTaskMutation.mutate({ id: editTask.id, newText: editText }); setIsModalOpen(false); }} className="px-4 py-2 bg-blue-500 text-white rounded">
+                  Update
+                </button>
               </div>
             </div>
           </div>
