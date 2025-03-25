@@ -3,57 +3,63 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { tasksCollection, auth } from "../lib/firebase";
 import { 
-  addDoc, getDocs, deleteDoc, doc, updateDoc, writeBatch 
+  addDoc, getDocs, deleteDoc, doc, updateDoc, writeBatch, query, where 
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { CheckCircle, Trash2, Pencil, LogOut } from "lucide-react";
 import { Reorder, motion } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuthState } from "react-firebase-hooks/auth";
 
 export default function TodoList() {
   const [task, setTask] = useState("");
   const [editTask, setEditTask] = useState(null);
   const [editText, setEditText] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [user] = useAuthState(auth); // Get the logged-in user
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const { data: tasks = [] } = useQuery({
-    queryKey: ["tasks"],
+    queryKey: ["tasks", user?.uid],  // Cache per user
     queryFn: async () => {
-      const querySnapshot = await getDocs(tasksCollection);
+      if (!user) return []; // If no user, return empty
+      const q = query(tasksCollection, where("uid", "==", user.uid));
+      const querySnapshot = await getDocs(q);
       return querySnapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }))
         .sort((a, b) => a.order - b.order);
     },
+    enabled: !!user, // Run only when user exists
   });
 
   const addTaskMutation = useMutation({
     mutationFn: async (newTask) => {
-      await addDoc(tasksCollection, { text: newTask, completed: false, order: tasks.length });
+      if (!user) return;
+      await addDoc(tasksCollection, { text: newTask, completed: false, order: tasks.length, uid: user.uid });
     },
-    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+    onSuccess: () => queryClient.invalidateQueries(["tasks", user?.uid]),
   });
 
   const toggleCompleteMutation = useMutation({
     mutationFn: async ({ id, completed }) => {
       await updateDoc(doc(tasksCollection, id), { completed: !completed });
     },
-    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+    onSuccess: () => queryClient.invalidateQueries(["tasks", user?.uid]),
   });
 
   const deleteTaskMutation = useMutation({
     mutationFn: async (id) => {
       await deleteDoc(doc(tasksCollection, id));
     },
-    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+    onSuccess: () => queryClient.invalidateQueries(["tasks", user?.uid]),
   });
 
   const updateTaskMutation = useMutation({
     mutationFn: async ({ id, newText }) => {
       await updateDoc(doc(tasksCollection, id), { text: newText });
     },
-    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+    onSuccess: () => queryClient.invalidateQueries(["tasks", user?.uid]),
   });
 
   const reorderMutation = useMutation({
@@ -65,7 +71,7 @@ export default function TodoList() {
       });
       await batch.commit();
     },
-    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
+    onSuccess: () => queryClient.invalidateQueries(["tasks", user?.uid]),
   });
 
   const handleLogout = async () => {

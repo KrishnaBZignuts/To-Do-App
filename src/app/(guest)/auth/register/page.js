@@ -55,7 +55,7 @@ const RegisterPage = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
       const user = userCredential.user;
 
-      await setDoc(doc(usersCollection, user.uid), {
+      await setDoc(doc(userCollection, user.uid), {
         uid: user.uid,
         email: user.email,
         displayName: form.displayName,
