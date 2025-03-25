@@ -33,7 +33,6 @@ const RegisterPage = () => {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
 
-    // Validate password in real-time
     if (name === 'password') {
       setPasswordValid(passwordRegex.test(value));
     }
@@ -56,7 +55,6 @@ const RegisterPage = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
       const user = userCredential.user;
 
-      // Store user info in Firestore
       await setDoc(doc(usersCollection, user.uid), {
         uid: user.uid,
         email: user.email,
@@ -88,9 +86,9 @@ const RegisterPage = () => {
           elevation={6}
           sx={{
             p: 4,
-            borderRadius: 3, // Rounded corners
-            boxShadow: 3, // Soft shadow
-            backgroundColor: '#f9f9f9', // Light gray background
+            borderRadius: 3, 
+            boxShadow: 3, 
+            backgroundColor: '#f9f9f9', 
             textAlign: 'center',
           }}
         >
