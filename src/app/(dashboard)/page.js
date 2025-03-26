@@ -1,9 +1,9 @@
-import TaskList from "@/components/TaskList";
+import ToDoList from "@/components/ToDoList";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <TaskList />
+      <ToDoList />
     </div>
   );
 }
