@@ -3,13 +3,13 @@ import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { getFirestore, collection } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDNxpuhZD2VcgKriyCamAaMuVEnRv0azpM",
-  authDomain: "to-do-app-73ab2.firebaseapp.com",
-  projectId: "to-do-app-73ab2",
-  storageBucket: "to-do-app-73ab2.appspot.com", 
-  messagingSenderId: "175934665235",
-  appId: "1:175934665235:web:e3dcb9a81f6461d70245e6",
-  measurementId: "G-TZH3V93C90",
+  apiKey: "AIzaSyC-VESocPCHcbWYjMhB690IcgwkcayqGdA",
+  authDomain: "task-manager-604fe.firebaseapp.com",
+  projectId: "task-manager-604fe",
+  storageBucket: "task-manager-604fe.firebasestorage.app",
+  messagingSenderId: "669376625556",
+  appId: "1:669376625556:web:82fb70049f2bafad80ad81",
+  measurementId: "G-3F5WYHDLYL"
 };
 
 const app = initializeApp(firebaseConfig);
